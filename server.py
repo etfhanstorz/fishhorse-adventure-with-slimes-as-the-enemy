@@ -86,7 +86,8 @@ class Handler(SimpleHTTPRequestHandler):
             with open(save_path(token), "w", encoding="utf-8") as f:
                 f.write(game.dumps())
             bar = game.bar()
-        self._json(200, {"out": out, "bar": bar})
+            view = game.view()
+        self._json(200, {"out": out, "bar": bar, "view": view})
 
     def log_message(self, fmt, *args):
         pass  # keep the console quiet; set to print() to debug

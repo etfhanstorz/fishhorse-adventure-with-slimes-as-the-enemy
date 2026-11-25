@@ -789,3 +789,28 @@ class Game:
             self.hp += 5 + (3 if self.has("healer") else 0)
             self.points += 1
             out.append(f"LEVEL UP! You are now level {self.level}. +1 skill point.")
+
+    # ------------------------------------------------------------- UI data
+    def view(self):
+        """Plain-dict snapshot of everything the 2D front-end needs."""
+        return {
+            "grid": self.grid,
+            "pos": list(self.pos),
+            "explored": [list(t) for t in self.explored],
+            "tile": self.tile(),
+            "hp": self.hp, "max_hp": self.max_hp,
+            "level": self.level, "xp": self.xp, "xp_need": self.xp_needed(),
+            "gold": self.gold, "potions": self.potions, "essence": self.essence,
+            "points": self.points, "mining_tier": self.mining_tier(),
+            "ores": {k: v for k, v in self.ores.items() if v},
+            "weapons": self.weapons, "equipped": self.equipped,
+            "battle": self.battle, "cool": self.cool,
+            "active": self.active, "board": self.board,
+            "skills": self.skills,
+            "skill_defs": SKILLS,
+            "weapon_types": {k: {"dmg": v[0], "crit": v[1], "special": v[2][0]}
+                             for k, v in WEAPON_TYPES.items()},
+            "materials": {k: v[0] for k, v in MATERIALS.items()},
+            "enchants": ENCHANTS,
+            "tile_names": TILE_NAMES,
+        }
