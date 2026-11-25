@@ -16,7 +16,10 @@ const ORE_COLOR = { copper: "#cd7f32", iron: "#a9b4c2", silver: "#e5e7eb",
 
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
-canvas.width = CW; canvas.height = CH;
+// Draw at 1920x1080 for a sharp 1080p picture; the game layout stays in CW x CH units.
+const OUT_W = 1920, OUT_H = 1080;
+const SCALE = Math.min(OUT_W / CW, OUT_H / CH);
+canvas.width = OUT_W; canvas.height = OUT_H;
 
 const $ = (id) => document.getElementById(id);
 const logEl = $("log"), panelEl = $("panel"), tabsEl = $("tabs"), padEl = $("pad"), modeEl = $("mode");
@@ -254,6 +257,7 @@ function drawBattle(t) {
 }
 
 function render(t) {
+  ctx.setTransform(SCALE, 0, 0, SCALE, 0, 0);
   if (V) {
     if (V.battle) drawBattle(t);
     else drawMap();
