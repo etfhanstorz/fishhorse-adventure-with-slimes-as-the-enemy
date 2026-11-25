@@ -86,7 +86,8 @@ MINING     mine (on ^ mountain or C cave)   inv   weapons
 SMITHING   smelt <ore>   forge <type> <material>   types   materials
 ENCHANT    enchants   enchant <weapon#> <name>
 EQUIP      equip <weapon#>   sell <weapon#>
-VILLAGE    shop   buy potion   rest   board   accept <n>   quests   claim <n>
+VILLAGE    shop   buy potion   buy cat (60g)   rest   board   accept <n>   quests   claim <n>
+PET        pet   use potion cat
 SKILLS     skills   learn <name>
 SAVE       save   (also autosaves)
 HELP       help"""

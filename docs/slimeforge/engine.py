@@ -63,6 +63,9 @@ ENCHANT_GOLD = 30
 ENCHANT_ESSENCE = 1
 POTION_HEAL = 25
 POTION_PRICE = 10
+CAT_PRICE = 60
+CAT_NAMES = ["Mochi", "Biscuit", "Pepper", "Luna", "Tofu", "Ginger", "Nori", "Maple"]
+CAT_FURS = ["orange", "gray", "black", "white", "calico"]
 
 SKILLS = {
     "brawn":      {"cost": 1, "req": [], "desc": "+2 damage on every hit"},
@@ -108,6 +111,7 @@ class Game:
         self.board = [self._new_quest() for _ in range(3)]
         self.battle = None
         self.cool = 0
+        self.cat = None         # {"name", "fur", "level", "xp", "hp", "max_hp", "atk"}
 
     # ------------------------------------------------------------------ save
     def to_dict(self):
@@ -124,6 +128,7 @@ class Game:
         data = dict(d)
         data["explored"] = {tuple(t) for t in data["explored"]}
         data["pos"] = tuple(data["pos"])
+        data.setdefault("cat", None)      # saves from before pets existed
         g.__dict__.update(data)
         return g
 
@@ -293,6 +298,8 @@ class Game:
                 return ["There is no fight right now."]
             return battle_cmds[cmd]()
         if cmd == "use" and args[:1] == ["potion"]:
+            if len(args) > 1 and args[1] == "cat":
+                return self.cmd_potion_cat()
             return self.cmd_use_potion()
         if cmd == "use":
             return ["Use what? Try 'use potion'."]
@@ -331,6 +338,10 @@ class Game:
                     "Type 'buy potion'."]
         if cmd == "buy" and args[:1] == ["potion"]:
             return self.cmd_buy_potion()
+        if cmd == "buy" and args[:1] == ["cat"]:
+            return self.cmd_buy_cat()
+        if cmd == "pet":
+            return self.cmd_pet()
         if cmd == "rest":
             return self.cmd_rest()
         if cmd == "board":
@@ -559,7 +570,48 @@ class Game:
         if not self._at_village():
             return ["You can only rest in the village."]
         self.hp = self.max_hp
-        return ["You rest at the inn and feel refreshed. HP full."]
+        out = ["You rest at the inn and feel refreshed. HP full."]
+        if self.cat:
+            self.cat["hp"] = self.cat["max_hp"]
+            out.append(f"{self.cat['name']} curls up and recovers fully.")
+        return out
+
+    # --------------------------------------------------------------- pets
+    def _cat_need(self, c):
+        return 12 * c["level"]
+
+    def cmd_buy_cat(self):
+        if not self._at_village():
+            return ["Cats are sold in the village."]
+        if self.cat:
+            return [f"You already have {self.cat['name']}."]
+        if self.gold < CAT_PRICE:
+            return [f"A cat costs {CAT_PRICE} gold. You have {self.gold}."]
+        self.gold -= CAT_PRICE
+        name = self.rng.choice(CAT_NAMES)
+        fur = self.rng.choice(CAT_FURS)
+        self.cat = {"name": name, "fur": fur, "level": 1, "xp": 0,
+                    "hp": 12, "max_hp": 12, "atk": 3}
+        return [f"You adopted {name}, a {fur} cat! It will follow you and fight beside you."]
+
+    def cmd_pet(self):
+        c = self.cat
+        if not c:
+            return ["You have no pet. Buy a cat in the village: 'buy cat'."]
+        state = "ready to fight" if c["hp"] > 0 else "knocked out: rest in the village or use a potion"
+        return [f"{c['name']} the {c['fur']} cat   Lv {c['level']}   XP {c['xp']}/{self._cat_need(c)}",
+                f"HP {c['hp']}/{c['max_hp']}   Attack {c['atk']}   ({state})"]
+
+    def cmd_potion_cat(self):
+        c = self.cat
+        if not c:
+            return ["You have no cat."]
+        if self.potions <= 0:
+            return ["No potions left."]
+        self.potions -= 1
+        healed = min(15, c["max_hp"] - c["hp"])
+        c["hp"] += healed
+        return [f"{c['name']} laps up a potion and heals {healed} HP."]
 
     # -------------------------------------------------------------- quests
     def cmd_board(self):
@@ -714,6 +766,14 @@ class Game:
             healed = max(1, total // 2)
             self.hp = min(self.max_hp, self.hp + healed)
             out.append(f"Reap heals you for {healed}.")
+        c = self.cat
+        if c and c["hp"] > 0 and b["hp"] > 0:
+            dmg = c["atk"] + self.rng.randint(0, 2)
+            if self.rng.random() < 0.1:
+                dmg *= 2
+                out.append(f"{c['name']} lands a fierce pounce!")
+            b["hp"] -= dmg
+            out.append(f"{c['name']} pounces for {dmg}!")
         if b["hp"] <= 0:
             return out + self._win()
         return out
@@ -734,6 +794,13 @@ class Game:
         if b["stun"] > 0:
             b["stun"] -= 1
             out.append("The slime is stunned and can't attack.")
+        elif self.cat and self.cat["hp"] > 0 and self.rng.random() < 0.35:
+            c = self.cat
+            dmg = b["atk"] + self.rng.randint(0, 2)
+            c["hp"] = max(0, c["hp"] - dmg)
+            out.append(f"The {b['color']} slime attacks {c['name']} for {dmg}!")
+            if c["hp"] <= 0:
+                out.append(f"{c['name']} is knocked out! Rest in the village to revive.")
         else:
             dmg = b["atk"] + self.rng.randint(0, 2)
             self.hp -= dmg
@@ -771,6 +838,16 @@ class Game:
         self.battle = None
         self.cool = 0
         self._gain_xp(b["xp"], out)
+        c = self.cat
+        if c and c["hp"] > 0:
+            c["xp"] += max(1, b["xp"] // 2)
+            if c["xp"] >= self._cat_need(c):
+                c["xp"] -= self._cat_need(c)
+                c["level"] += 1
+                c["atk"] += 1
+                c["max_hp"] += 4
+                c["hp"] = c["max_hp"]
+                out.append(f"{c['name']} grew to level {c['level']}!")
         return out
 
     def _die(self):
@@ -808,7 +885,7 @@ class Game:
             "points": self.points, "mining_tier": self.mining_tier(),
             "ores": {k: v for k, v in self.ores.items() if v},
             "weapons": self.weapons, "equipped": self.equipped,
-            "battle": self.battle, "cool": self.cool,
+            "battle": self.battle, "cool": self.cool, "cat": self.cat,
             "active": self.active, "board": self.board,
             "skills": self.skills,
             "skill_defs": SKILLS,

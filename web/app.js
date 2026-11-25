@@ -41,6 +41,9 @@ let walkUntil = 0, facing = 1;
 let hurtUntil = 0, heroHurtUntil = 0, deathFlash = 0, levelBanner = null;
 let prevEnemyHp = null, prevEnemyColor = null, prevHeroHp = null;
 let mineFlashUntil = 0;
+let catLungeUntil = 0, catX = null, catY = null, lastPos = null, prevCatHp = null;
+const FUR = { orange: ["#f29b38", "#c9731f"], gray: ["#9aa0a6", "#6b7078"], black: ["#2b2b30", "#111115"],
+              white: ["#f5f5f5", "#c9c9d0"], calico: ["#f0b27a", "#2b2b30"] };
 
 // ------------------------------------------------------------ helpers
 function hash(x, y) { return (((x + 7) * 73856093) ^ ((y + 3) * 19349663)) >>> 0; }
@@ -271,6 +274,52 @@ function drawHero(px, py, scale = 1, time = 0, moving = false) {
   ctx.restore();
 }
 
+function drawCat(x, y, scale, c, time, flip = false) {
+  const [main, dark] = FUR[c.fur] || FUR.orange;
+  const knocked = c.hp <= 0;
+  const bob = knocked ? 0 : Math.sin(time / 300) * -1;
+  ctx.save();
+  ctx.translate(x, y); ctx.scale(scale, scale);
+  if (flip) { ctx.translate(16, 0); ctx.scale(-1, 1); ctx.translate(-16, 0); }
+  drawShadow(16, 24, 10);
+  ctx.translate(0, bob);
+  // tail
+  ctx.strokeStyle = dark; ctx.lineWidth = 3; ctx.lineCap = "round";
+  ctx.beginPath(); ctx.moveTo(6, 18); ctx.quadraticCurveTo(-2, 14, 3, 8 + Math.sin(time / 200) * 2); ctx.stroke();
+  ctx.lineCap = "butt";
+  // body, legs, head, ears
+  ctx.fillStyle = main;
+  ctx.beginPath(); ctx.ellipse(16, 18, 10, 6.5, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = dark; ctx.fillRect(9, 22, 3, 4); ctx.fillRect(19, 22, 3, 4);
+  ctx.fillStyle = main;
+  ctx.beginPath(); ctx.arc(24, 12, 6, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(19, 8); ctx.lineTo(20, 2); ctx.lineTo(23, 7); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(25, 7); ctx.lineTo(28, 2); ctx.lineTo(29, 8); ctx.fill();
+  if (c.fur === "calico") {
+    ctx.fillStyle = "#2b2b30";
+    ctx.beginPath(); ctx.ellipse(12, 16, 3, 2, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(27, 9, 2, 0, Math.PI * 2); ctx.fill();
+  }
+  // eyes
+  if (knocked) {
+    ctx.strokeStyle = "#111"; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(21, 10); ctx.lineTo(23, 12); ctx.moveTo(23, 10); ctx.lineTo(21, 12); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(25, 10); ctx.lineTo(27, 12); ctx.moveTo(27, 10); ctx.lineTo(25, 12); ctx.stroke();
+  } else {
+    const blink = (time % 4000) < 120;
+    ctx.fillStyle = "#7fe08a";
+    if (blink) { ctx.fillRect(21, 11, 3, 1); ctx.fillRect(25, 11, 3, 1); }
+    else {
+      ctx.beginPath(); ctx.ellipse(22, 11, 1.5, 2.2, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(27, 11, 1.5, 2.2, 0, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  ctx.fillStyle = "#ff8fa3"; ctx.fillRect(24.5, 14, 2, 1.2);
+  ctx.strokeStyle = "rgba(255,255,255,0.75)"; ctx.lineWidth = 0.7;
+  ctx.beginPath(); ctx.moveTo(30, 13); ctx.lineTo(36, 12); ctx.moveTo(30, 14.5); ctx.lineTo(36, 15); ctx.stroke();
+  ctx.restore();
+}
+
 function drawSlime(cx, cy, color, time, hurt, shadowW = 62) {
   const beat = Math.sin(time / 230);
   const squash = hurt ? 0.25 : 0.08;
@@ -360,6 +409,7 @@ function drawMap(time) {
 
   const [px, py] = V.pos;
   const moving = time < walkUntil;
+  if (V.cat && catX !== null) drawCat(catX * T - 6, catY * T + 2, 0.8, V.cat, time, facing < 0);
   drawHero(px * T + 0, py * T - 2, 1, time, moving);
 
   // HUD strip
@@ -399,6 +449,12 @@ function drawBattle(time) {
   drawHero(120, 110, 3, time, false);
   if (heroHurt) { ctx.fillStyle = "rgba(255,80,80,0.25)"; ctx.beginPath(); ctx.arc(150, 150, 60, 0, Math.PI * 2); ctx.fill(); }
   drawBar(60, 104, 200, 16, V.hp / V.max_hp, "#ef476f", `You  ${V.hp}/${V.max_hp}`);
+  if (V.cat) {
+    const lunge = time < catLungeUntil ? 26 : 0;
+    drawCat(232 + lunge, 150, 2.6, V.cat, time);
+    drawBar(200, 252, 130, 12, V.cat.hp / V.cat.max_hp, "#f7a072",
+            `${V.cat.name} Lv${V.cat.level}  ${V.cat.hp}/${V.cat.max_hp}`);
+  }
 
   const hurt = time < hurtUntil;
   const shakeX = hurt ? (Math.random() - 0.5) * 10 : 0;
@@ -506,6 +562,21 @@ function renderPanel() {
       el("div", { class: "item", text: `Gold ${V.gold}  |  Potions ${V.potions}  |  Essence ${V.essence}` }),
       button(`Drink potion (${V.potions})`, "use potion", "btn", V.potions <= 0),
     );
+    if (V.cat) {
+      const c = V.cat;
+      panelEl.append(el("div", { class: "item" }, [
+        el("div", { style: "font-weight:700;color:#ffd166", text: `Pet: ${c.name} the ${c.fur} cat · Lv ${c.level}` }),
+        el("div", { class: "muted", text: `HP ${c.hp}/${c.max_hp} · Attack ${c.atk} · XP ${c.xp}/${12 * c.level}` }),
+        el("div", { class: "row" }, [
+          button("Heal cat (potion)", "use potion cat", "btn", V.potions <= 0),
+        ]),
+      ]));
+    } else {
+      panelEl.append(el("div", { class: "item" }, [
+        el("div", { class: "muted", text: "No pet yet. A cat follows you and fights beside you." }),
+        button("Buy a cat (60 gold)", "buy cat", "btn", !inVillage || V.gold < 60),
+      ]));
+    }
     const ores = Object.entries(V.ores).map(([k, v]) => `${k} x${v}`).join(", ") || "none";
     panelEl.append(el("div", { class: "item muted", text: "Materials: " + ores }));
     if (!V.weapons.length) panelEl.append(el("div", { class: "muted", text: "No weapons yet. Mine ore, smelt bars, forge one in the village." }));
@@ -617,6 +688,11 @@ function reactTo(view, out, prevHp, nowT) {
   } else if (prevHp !== null && view.hp > prevHp && b) {
     spawnText(`+${view.hp - prevHp}`, heroX + 40, heroY, "#06d6a0", 22);
   }
+  if (/pounces/.test(out)) catLungeUntil = nowT + 260;
+  if (/knocked out/.test(out)) spawnText("KO!", 250, 120, "#ff6b8a", 30);
+  if (view.cat && prevCatHp !== null && view.cat.hp < prevCatHp && b) {
+    spawnText(`-${prevCatHp - view.cat.hp}`, 250, 130, "#ffb3d1", 22);
+  }
   if (/You dig up/.test(out)) {
     mineFlashUntil = nowT + 200;
     const [px, py] = view.pos;
@@ -643,6 +719,11 @@ function reactTo(view, out, prevHp, nowT) {
 function applyView(view, out) {
   const now = performance.now();
   reactTo(view, out || "", prevHeroHp, now);
+  const np = view.pos;
+  if (!lastPos) { catX = np[0]; catY = np[1]; }
+  else if (lastPos[0] !== np[0] || lastPos[1] !== np[1]) { catX = lastPos[0]; catY = lastPos[1]; }
+  lastPos = np;
+  prevCatHp = view.cat ? view.cat.hp : null;
   prevEnemyHp = view.battle ? view.battle.hp : null;
   prevEnemyColor = view.battle ? view.battle.color : null;
   prevHeroHp = view.hp;
