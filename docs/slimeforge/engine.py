@@ -50,6 +50,7 @@ SLIMES = {
     "blue": {"hp": 18, "atk": 3, "xp": 9, "gold": 6},
     "red": {"hp": 28, "atk": 5, "xp": 15, "gold": 10},
     "black": {"hp": 45, "atk": 7, "xp": 28, "gold": 18},
+    "king": {"hp": 70, "atk": 6, "xp": 40, "gold": 30},
 }
 ENCHANTS = {
     "sharpness": "+3 damage on every hit",
@@ -374,7 +375,7 @@ class Game:
             out.append("Village: shop, rest, board, accept, claim, smelt, forge, enchant.")
             return out
         if tile == "N":
-            out += self._start_battle(rng.choices(["red", "black"], [7, 3])[0])
+            out += self._start_battle(rng.choices(["red", "black", "king"], [6, 3, 1])[0])
         elif tile == "C" and rng.random() < 0.35:
             out += self._start_battle("black")
         elif tile == "T" and rng.random() < 0.25:
@@ -758,6 +759,9 @@ class Game:
         if self.rng.random() < 0.35:
             self.essence += 1
             out.append("The slime leaves behind essence (+1 essence).")
+        if self.rng.random() < 0.15:
+            self.potions += 1
+            out.append("The slime dropped a potion (+1 potion).")
         if self.rng.random() < 0.08:
             wtype = self.rng.choice(list(WEAPON_TYPES))
             mats = [m for m, (t, _) in MATERIALS.items() if t <= self.mining_tier()]
