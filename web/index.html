@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Slime Forge</title>
+<style>
+  :root { --bg:#0d1117; --fg:#c9d1d9; --dim:#6e7681; --accent:#7ee787; --panel:#161b22; --border:#30363d; }
+  @media (prefers-color-scheme: light) {
+    :root { --bg:#f6f8fa; --fg:#24292f; --dim:#57606a; --accent:#116329; --panel:#ffffff; --border:#d0d7de; }
+  }
+  :root[data-theme="dark"] { --bg:#0d1117; --fg:#c9d1d9; --dim:#6e7681; --accent:#7ee787; --panel:#161b22; --border:#30363d; }
+  body { margin:0; background:var(--bg); color:var(--fg); font-family: Consolas, "Courier New", monospace; }
+  header { padding:12px 16px; border-bottom:1px solid var(--border); display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+  header h1 { font-size:18px; margin:0; color:var(--accent); }
+  #mode { font-size:12px; color:var(--dim); }
+  #bar { font-size:13px; color:var(--accent); padding:8px 16px; background:var(--panel); border-bottom:1px solid var(--border); overflow-x:auto; white-space:nowrap; }
+  #term { margin:0; padding:12px 16px; height:60vh; overflow-y:auto; white-space:pre-wrap; word-break:break-word; font-size:14px; line-height:1.35; }
+  .cmd { color:var(--accent); }
+  form { display:flex; gap:8px; padding:8px 16px; border-top:1px solid var(--border); background:var(--panel); }
+  input[type=text] { flex:1; min-width:0; background:var(--bg); color:var(--fg); border:1px solid var(--border); border-radius:6px; padding:10px; font:inherit; font-size:16px; }
+  button { background:var(--bg); color:var(--fg); border:1px solid var(--border); border-radius:6px; padding:8px 10px; font:inherit; cursor:pointer; }
+  button:hover { border-color:var(--accent); color:var(--accent); }
+  #quick { display:flex; flex-wrap:wrap; gap:6px; padding:8px 16px; }
+  @media (max-width:600px) { #term { font-size:13px; height:55vh; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Slime Forge</h1>
+  <span id="mode">connecting...</span>
+</header>
+<div id="bar">HP -- | Lv -- | Gold --</div>
+<pre id="term"></pre>
+<div id="quick"></div>
+<form id="f" autocomplete="off">
+  <input type="text" id="in" placeholder="type a command, e.g. move n, mine, forge sword iron" autofocus>
+  <button type="submit">Enter</button>
+</form>
+<script src="app.js"></script>
+</body>
+</html>
